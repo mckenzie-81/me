@@ -13,25 +13,45 @@ import {
 } from "@/lib/loader/machine";
 
 import { Wordmark } from "./Wordmark";
+import { WORDMARK_WIPE } from "./wordmark-data";
 
 /**
- * The intro: the wordmark draws itself, then the screen lifts away in two
- * sheets.
+ * The intro: the signature writes itself, then the screen lifts away in
+ * stacked colour panels.
  *
- * This component is deliberately thin. Every decision worth getting right —
- * whether to play at all, which phase follows which, what happens when events
- * arrive out of order — lives in `@/lib/loader/*`, which is unit tested.
- * What is left here is the part that can only be judged by looking at it:
- * durations, easings and stacking.
+ * Deliberately thin. Every decision with a real failure mode — whether to play
+ * at all, which phase follows which, what happens when callbacks arrive out of
+ * order — lives in `@/lib/loader/*` and is unit tested. What is left here is
+ * the part only an eye can judge: durations, easings, stacking order.
  *
- * Whether to play is NOT decided here either. The blocking script in the
- * document head decides before first paint and records it as `data-intro` on
- * <html>; this component reads that verdict. Deciding in an effect would mean
- * one frame of curtain for someone who should never have seen it.
+ * Whether to play is decided by the blocking script in the document head and
+ * read here from `data-intro`. Deciding in an effect would cost one visible
+ * frame of curtain for someone who should never have seen it.
  */
 
 /** Longest the intro may hold the page, whatever goes wrong. */
 const SAFETY_TIMEOUT_MS = 6000;
+
+/**
+ * Curtain panels, back to front — which is also DOM order, so the stacking
+ * needs no z-index. The last entry is the front panel and carries the
+ * signature.
+ *
+ * Every panel must contrast with the one behind it, or its lift is invisible.
+ * That rules out ending on paper, since the page itself is paper: the final
+ * reveal would be paper sliding off paper. So the stack runs dark to light and
+ * hands over to the page — ink, then accent, then paper:
+ *
+ *   ink (signature)  ->  accent  ->  paper page
+ *
+ * It also means the loader is a different surface from the home rather than
+ * looking like the home with a signature sitting on it. Arriving in the dark
+ * and having light flood in is the whole transition.
+ *
+ * Two panels, not three. A third only pays for itself if it contrasts with
+ * both neighbours, and this palette has no fourth value that does.
+ */
+const CURTAINS = ["bg-accent", "bg-ink"] as const;
 
 export function Intro({ word }: { word: string }) {
   const [state, dispatch] = useReducer(loaderReducer, initialLoaderState);
@@ -53,7 +73,7 @@ export function Intro({ word }: { word: string }) {
 
       if (document.documentElement.dataset.intro !== "play") {
         // Reduced motion, a repeat visit this session, or the head script
-        // failed. The overlay is already hidden by CSS; just tidy up.
+        // failed. CSS already hid the overlay; just tidy up.
         dispatch({ type: "SKIP" });
         release();
         return;
@@ -62,27 +82,17 @@ export function Intro({ word }: { word: string }) {
       dispatch({ type: "START" });
 
       // Browsers restore scroll position on reload. Without this the curtain
-      // would lift on whatever section the visitor happened to be reading.
+      // lifts on whatever section the visitor was last reading.
       lenis?.stop();
       window.scrollTo(0, 0);
 
-      const letters = gsap.utils.toArray<SVGPathElement>("[data-letter]", root);
-      const front = root.querySelector('[data-curtain="front"]');
-      const back = root.querySelector('[data-curtain="back"]');
+      const wipe = root.querySelector("[data-wipe]");
       const mark = root.querySelector("[data-wordmark]");
-
-      // Prime each outline as a single dash exactly as long as the path, then
-      // offset it by its own length — which hides it completely. Animating the
-      // offset back to zero walks the dash along the path: the draw.
-      // The length has to be measured per letter; a shared value would make
-      // "i" finish long before "m" has started.
-      letters.forEach((letter) => {
-        const length = letter.getTotalLength();
-        gsap.set(letter, {
-          strokeDasharray: length,
-          strokeDashoffset: length,
-        });
-      });
+      // DOM order is back-to-front; reverse so the stagger lifts the top sheet
+      // first and each panel below is revealed in turn.
+      const panels = gsap.utils
+        .toArray<HTMLElement>("[data-curtain]", root)
+        .reverse();
 
       const timeline = gsap.timeline({
         defaults: { ease: "power2.inOut" },
@@ -93,56 +103,42 @@ export function Intro({ word }: { word: string }) {
       });
 
       timeline
-        // 1 — draw
-        .to(letters, {
-          strokeDashoffset: 0,
-          duration: 0.9,
-          stagger: 0.06,
-        })
+        // 1 — write. A clip sweeping along the writing direction, not a
+        // stroke-dash: this artwork is a filled monoline script, and dashing
+        // its perimeter unrolls the whole word at once instead of writing it.
+        .fromTo(
+          wipe,
+          { attr: { width: 0 } },
+          { attr: { width: WORDMARK_WIPE.width }, duration: 1.3 },
+        )
         .add(() => dispatch({ type: "DRAW_COMPLETE" }))
 
-        // 2 — settle: ink floods the outlines, and the outlines dissolve into
-        // it. `fill` is switched instantly rather than tweened because "none"
-        // is a keyword, not a colour, and has nothing to interpolate from.
-        // Opacity is what actually animates.
-        .set(letters, { fill: "currentColor" })
-        .to(letters, { fillOpacity: 1, duration: 0.4, stagger: 0.015 })
-        .to(letters, { strokeOpacity: 0, duration: 0.3 }, "<")
+        // 2 — settle. A beat to read it before anything moves.
+        .to({}, { duration: 0.25 })
         .add(() => dispatch({ type: "SETTLE_COMPLETE" }))
-        .to({}, { duration: 0.2 })
 
-        // 3 — lift. Two sheets, not one: the paper sheet rises to reveal navy
-        // behind it, then navy rises to reveal the page. The 0.12s offset is
-        // the whole effect — simultaneous sheets just look like one sheet.
-        .to(front, {
+        // 3 — lift.
+        .to(panels, {
           yPercent: -100,
-          duration: 1,
+          duration: 0.9,
           ease: "power4.inOut",
+          stagger: 0.12,
         })
         .to(
           mark,
           {
             // Drifts slower than the sheet carrying it, so the lift has depth
-            // instead of reading as one flat plane sliding off.
+            // rather than reading as one flat plane sliding off.
             yPercent: -35,
-            duration: 1,
+            duration: 0.9,
             ease: "power4.inOut",
           },
           "<",
-        )
-        .to(
-          back,
-          {
-            yPercent: -100,
-            duration: 1,
-            ease: "power4.inOut",
-          },
-          "<0.12",
         );
 
-      // If any callback above never fires — a dropped frame budget, a GSAP
-      // error, a tab backgrounded at the wrong moment — the page must not stay
-      // covered. This is the one guarantee worth hard-coding.
+      // If a callback never fires — dropped frames, a GSAP error, the tab
+      // backgrounded at the wrong moment — the page must not stay covered.
+      // This is the one guarantee worth hard-coding.
       const safety = window.setTimeout(() => {
         timeline.kill();
         dispatch({ type: "SKIP" });
@@ -161,23 +157,29 @@ export function Intro({ word }: { word: string }) {
       ref={rootRef}
       data-intro-root
       /**
-       * Decorative. The real page is already behind this overlay and fully
+       * Decorative. The page is already behind this overlay and fully
        * available to assistive tech, so announcing a loading screen would add
-       * noise and a focus trap for no benefit. Sighted users get the intro;
-       * everyone else gets the content immediately.
+       * noise and a focus trap for no benefit.
        */
       aria-hidden
       className="pointer-events-none fixed inset-0 z-[100]"
     >
-      <div data-curtain="back" className="absolute inset-0 bg-navy" />
-      <div
-        data-curtain="front"
-        className="absolute inset-0 flex items-center justify-center bg-paper"
-      >
-        <div data-wordmark className="w-[min(62vw,34rem)]">
-          <Wordmark word={word} className="w-full text-ink" />
+      {CURTAINS.map((surface, index) => (
+        <div
+          key={surface}
+          data-curtain
+          className={`absolute inset-0 ${surface}`}
+        >
+          {/* The signature rides the front sheet, so it leaves with it. */}
+          {index === CURTAINS.length - 1 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div data-wordmark className="w-[min(68vw,30rem)]">
+                <Wordmark reveal word={word} className="w-full text-paper" />
+              </div>
+            </div>
+          )}
         </div>
-      </div>
+      ))}
     </div>
   );
 }
