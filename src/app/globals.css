@@ -1,1 +1,180 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Tailwind v4 is configured here, not in a JS file. Anything declared in
+   `@theme` becomes a utility: `--color-ink-soft` gives `text-ink-soft`,
+   `bg-ink-soft`, `border-ink-soft`.
+
+   Tokens are named by ROLE, not by colour. `bg-paper` survives a palette
+   change; `bg-cream` does not. The six palette values are each given exactly
+   one job, because a palette this saturated turns muddy the moment two colours
+   compete for the same role.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* --- Surfaces --------------------------------------------------------- */
+
+  /* #ECE8DC — the page itself. Warm, so pure black text reads as ink on
+     paper rather than as a screen. */
+  --color-paper: #ece8dc;
+
+  /* #FFFFFF — used sparingly, only where something must lift off the page
+     (cards, the active state of a panel). On cream, white reads as raised. */
+  --color-raised: #ffffff;
+
+  /* #1B2F62 — the deep end. Full-bleed sections and the curtain panel.
+     Dark enough to carry white text at AAA. */
+  --color-navy: #1b2f62;
+
+  /* --- Ink -------------------------------------------------------------- */
+
+  /* #000000 — primary text only. */
+  --color-ink: #000000;
+
+  /* Secondary and tertiary text are mixed from NAVY, not black, so faded text
+     cools towards the palette instead of going grey and dead. */
+  --color-ink-soft: color-mix(in oklab, #1b2f62 72%, #ece8dc);
+  --color-ink-faint: color-mix(in oklab, #1b2f62 45%, #ece8dc);
+
+  /* Hairline rules — the same mix, far lighter. Keeps every border in the
+     same family instead of an arbitrary grey. */
+  --color-rule: color-mix(in oklab, #1b2f62 18%, #ece8dc);
+
+  /* --- Signal ----------------------------------------------------------- */
+
+  /* #DE372D — reserved for accent and emphasis. Never a surface, never body
+     text. Its whole value is that it appears rarely. */
+  --color-red: #de372d;
+
+  /* #244A98 — interactive. Links, hovers, focus. Distinct from navy's
+     structural role so "blue thing" always means "you can click it". */
+  --color-blue: #244a98;
+
+  /* --- Type ------------------------------------------------------------- */
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Vertical rhythm as a token, so section spacing is a decision made once. */
+  --spacing-section: 8rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
+
+@layer base {
+  html {
+    /* Lenis owns scrolling. Native smooth-scroll fights it and makes anchor
+       navigation stutter, so this must stay `auto`. */
+    scroll-behavior: auto;
+    -webkit-text-size-adjust: 100%;
+    background-color: var(--color-paper);
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background-color: var(--color-red);
+    color: var(--color-paper);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue);
+    outline-offset: 3px;
+  }
+
+  img,
+  video,
+  svg {
+    display: block;
+    max-width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Pre-animation state.
+
+   The fix for "flash of visible content": elements that animate in must start
+   hidden, but ONLY when animation is actually going to run.
+
+   `data-animate="true"` is set on <html> by a blocking inline script in the
+   head (see layout.tsx) before first paint, and only when the user has not
+   asked for reduced motion. That gives three correct outcomes:
+
+     - motion fine      -> starts hidden, GSAP reveals it, no flash
+     - reduced motion   -> nothing hidden, nothing animates
+     - JS off or broken -> nothing hidden, content still readable
+
+   Hiding these in plain CSS instead would leave content invisible forever in
+   the last two cases.
+--------------------------------------------------------------------------- */
+
+:root[data-animate="true"] [data-reveal] {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-y, 1.75rem), 0);
+  will-change: transform, opacity;
+}
+
+/* Split headings stay hidden until the split has happened, otherwise the
+   unsplit text paints and then visibly jumps as line wrappers are inserted. */
+:root[data-animate="true"] [data-split] {
+  visibility: hidden;
+}
+
+/* The loader covers the page, so the page beneath must not scroll while it is
+   up. Set and removed by the loader, not by a component, so it cannot be left
+   behind if a component unmounts unexpectedly. */
+html[data-loading="true"],
+html[data-loading="true"] body {
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion: one global escape hatch.
+
+   The GSAP layer already checks this preference, but CSS animations and
+   transitions do not — every Tailwind `animate-*` and `transition-*` would
+   keep running. Neutralised here so no component has to remember.
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-animate="true"] [data-reveal] {
+    opacity: 1;
+    transform: none;
+  }
+
+  :root[data-animate="true"] [data-split] {
+    visibility: visible;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The intro overlay is always server-rendered, so the markup React hydrates is
+   identical whether or not the intro plays. When it is not playing, the head
+   script leaves `data-intro` unset and this hides the overlay before it can
+   paint — React then unmounts it after hydration. Deciding in React alone
+   would cost one visible frame of curtain. */
+html:not([data-intro="play"]) [data-intro-root] {
+  display: none;
+}
