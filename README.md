@@ -73,6 +73,16 @@ rather than being sliced vertically mid-stroke.
 Both of these were settled by rendering frames to disk and looking at them, not
 by reasoning about them. That cost about ten minutes and reversed the approach.
 
+The same artwork is the site's mark. The loader writes the signature, the
+curtain lifts, and it takes its place in the header — which makes the intro an
+introduction rather than a flourish that happens once and is never referred to
+again. It also stops the header repeating the `<h1>` directly beneath it.
+
+That needed one change. A monoline hairline is the point at intro size and
+nearly invisible at 24px, and a signature has no bold cut to switch to, so the
+weight is *added*: the same path is stroked as well as filled. Rendered side by
+side at 0, 0.7 and 1.2 units, 1.1 was the first that held on paper.
+
 ### The loader is a state machine, and that is not over-engineering
 
 The intro's phases are advanced by GSAP completion callbacks arriving from
@@ -138,6 +148,41 @@ reading as a signal. Secondary text is a warm grey drawn from the same family
 as the ink rather than a neutral one, so faded copy cools towards the scheme
 instead of going dead.
 
+### Measuring a design instead of approximating it
+
+The portrait is set into two leaning panels with a gap down the centre of the
+face. Three things about that frame were easy to get subtly wrong, and all
+three were settled by measurement rather than by eye.
+
+**The frames lean; the face does not.** The reflex is `skewY()` on the
+container, which is one line of CSS. It also tilts the eyes, and a tilted face
+reads as a bug rather than a composition. The panels are `clip-path` polygons
+instead, so the artwork underneath stays upright.
+
+**The panels are not parallelograms.** Fitting a line to the top and bottom
+edge of each panel in the exported frame gives -7.5° and -10°: the shapes taper
+very slightly to the right. A single skew angle would have been visibly flat
+next to the original.
+
+**The crop is not `object-fit: cover`.** The default looked close but wrong,
+so the asset was composited over the plate colour across a range of scales and
+offsets and matched against the export. The best fit was 124% of the box, pushed
+up and left — mean error 3.4 of 255. Cover was serving a noticeably wider
+photograph.
+
+![The exported frame beside the built component in both themes](docs/portrait-panels.png)
+
+The numbers live in `portrait-panels.ts` as percentages, with tests asserting
+the properties that would break the composition rather than the values
+themselves: that the shapes fill their box, that they leave a gap instead of
+overlapping, that both lean the same way, and that the crop can never leave a
+bare strip of plate along an edge.
+
+The portrait ships as a transparent cut-out and the surface behind it is a
+token, so it follows the theme. That mattered more than it sounds: at hairline
+contrast the plate vanished into the page in light and swallowed the subject's
+hair in dark, which is only visible once both are rendered side by side.
+
 ### Deleting more than was written
 
 An early pass built a typed content layer: content modules behind async getters,
@@ -162,6 +207,9 @@ and would otherwise take the page down. The reduced-motion and repeat-visit
 rules. The wordmark's accessible name, its clipped and unclipped states, and
 that two instances on one page get unique clip ids — SVG ids are document-global,
 so a collision silently makes the second wordmark drive the first one's clip.
+The portrait's frame geometry, as properties rather than as numbers — that the
+two shapes fill their box, leave a gap instead of overlapping, lean the same
+way, and crop inwards far enough that no edge can show bare plate.
 
 **Not tested.** The tweens. Asserting that `gsap.to` was called with
 `yPercent: -100` just reflects the implementation back as an assertion; it
@@ -192,8 +240,12 @@ is to make claims cheap to check:
 - Font outlines for an earlier wordmark were generated, rendered to an image and
   inspected before being wired in — then discarded entirely when the real
   signature arrived.
+- The portrait was first shipped as a plain image in a column, which was not
+  what the design did. The frame was then **recovered from the export by
+  measurement** — edge angles by line fit, crop by image registration —
+  instead of being approximated by eye a second time.
 
-Three reversals in a repo this small. Each was cheap because the verification
+Four reversals in a repo this small. Each was cheap because the verification
 was cheap. That is most of the technique: not better prompts, but shorter
 distances between a claim and evidence about it, and a willingness to delete
 work that was argued for well.
@@ -208,5 +260,7 @@ whatever the model produces first.
 
 - Section content and layout
 - Typography
+- Drifting the two portrait panels apart on scroll — the reason they are two
+  elements rather than one clipped one
 - A protected `/cms` for editing content, which is where the content layer
   earns its place back

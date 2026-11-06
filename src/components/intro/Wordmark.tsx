@@ -21,6 +21,16 @@ type WordmarkProps = {
    * will never come.
    */
   reveal?: boolean;
+  /**
+   * Thickens the signature by stroking the same outline it fills, in viewBox
+   * units.
+   *
+   * Needed because this is a monoline script: at intro size the hairline is
+   * the point, and at header size it is nearly invisible against paper. The
+   * artwork has no bold cut to switch to, so the weight is added rather than
+   * chosen. 0 — no stroke — is the artwork as supplied.
+   */
+  weight?: number;
 };
 
 /**
@@ -30,7 +40,12 @@ type WordmarkProps = {
  * `[data-wipe]` and the Intro animates it from outside. That keeps this
  * testable in jsdom and keeps the artwork reusable away from the loader.
  */
-export function Wordmark({ word, className, reveal = false }: WordmarkProps) {
+export function Wordmark({
+  word,
+  className,
+  reveal = false,
+  weight = 0,
+}: WordmarkProps) {
   // SVG ids are document-global, so two wordmarks on one page sharing a
   // clipPath id would mean the second silently drives the first one's clip.
   // useId is stable across server and client render, so it also survives
@@ -61,6 +76,10 @@ export function Wordmark({ word, className, reveal = false }: WordmarkProps) {
       <path
         d={WORDMARK_PATH}
         fill="currentColor"
+        stroke={weight ? "currentColor" : undefined}
+        strokeWidth={weight || undefined}
+        // Round joins: the script has sharp reversals that spike when stroked.
+        strokeLinejoin={weight ? "round" : undefined}
         clipPath={reveal ? `url(#${clipId})` : undefined}
       />
     </svg>

@@ -1,4 +1,13 @@
+import { Header } from "@/components/Header";
+import { Hero } from "@/components/Hero";
+
 export default function Home() {
-  // Intentionally blank. The curtain lifts onto this.
-  return <main className="min-h-svh" />;
+  return (
+    <>
+      <Header />
+      <main>
+        <Hero />
+      </main>
+    </>
+  );
 }

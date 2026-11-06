@@ -19,6 +19,22 @@ describe("Wordmark", () => {
     expect(paths[0]).toHaveAttribute("fill", "currentColor");
   });
 
+  it("is unstroked by default, as supplied", () => {
+    const { container } = render(<Wordmark word="Mckenzie" />);
+    expect(container.querySelector("path")).not.toHaveAttribute("stroke");
+  });
+
+  it("can be thickened for small sizes", () => {
+    // The hairline all but disappears at header size against paper. There is
+    // no bold cut of a signature, so the weight is stroked on.
+    const { container } = render(<Wordmark word="Mckenzie" weight={1.1} />);
+    const path = container.querySelector("path");
+    expect(path).toHaveAttribute("stroke", "currentColor");
+    expect(path).toHaveAttribute("stroke-width", "1.1");
+    // Still one path: thickened, not outlined on top of a second copy.
+    expect(container.querySelectorAll("path")).toHaveLength(1);
+  });
+
   it("is fully visible by default", () => {
     // Reused outside the intro (header, footer) it must just render, with no
     // clip waiting on an animation that will never run.

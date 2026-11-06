@@ -42,16 +42,17 @@ const SAFETY_TIMEOUT_MS = 6000;
  * reveal would be paper sliding off paper. So the stack runs dark to light and
  * hands over to the page — ink, then accent, then paper:
  *
- *   ink (signature)  ->  accent  ->  paper page
+ *   inverse surface (signature)  ->  accent  ->  the page
  *
- * It also means the loader is a different surface from the home rather than
- * looking like the home with a signature sitting on it. Arriving in the dark
- * and having light flood in is the whole transition.
+ * Using the `-inverse` tokens rather than literal colours means this holds in
+ * both themes without a branch: in light you arrive on dark and light floods
+ * in; in dark it is the other way round. The loader is never the same surface
+ * as the home it opens onto.
  *
  * Two panels, not three. A third only pays for itself if it contrasts with
  * both neighbours, and this palette has no fourth value that does.
  */
-const CURTAINS = ["bg-accent", "bg-ink"] as const;
+const CURTAINS = ["bg-accent", "bg-ground-inverse"] as const;
 
 export function Intro({ word }: { word: string }) {
   const [state, dispatch] = useReducer(loaderReducer, initialLoaderState);
@@ -174,7 +175,7 @@ export function Intro({ word }: { word: string }) {
           {index === CURTAINS.length - 1 && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div data-wordmark className="w-[min(68vw,30rem)]">
-                <Wordmark reveal word={word} className="w-full text-paper" />
+                <Wordmark reveal word={word} className="w-full text-ink-inverse" />
               </div>
             </div>
           )}

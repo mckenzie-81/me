@@ -3,48 +3,98 @@
 /* ---------------------------------------------------------------------------
    Tokens.
 
-   Named by ROLE, not by colour — `bg-paper` survives a palette change,
-   `bg-cream` would not. Tailwind v4 turns each one into utilities:
-   `--color-ink-muted` gives `text-ink-muted`, `border-ink-muted`, etc.
+   Named by ROLE, not by colour: `bg-ground` survives a palette change,
+   `bg-cream` would not. Light is the default; dark overrides the same
+   variables below, so no component ever branches on the theme.
+
+   The `-inverse` pair is what makes that possible for the intro. The loader
+   must always be the opposite surface to the page or its reveal is invisible,
+   and "opposite" is a different colour in each theme. Expressing it as a token
+   means the Intro component is theme-agnostic: it asks for the inverse and
+   gets the right answer either way.
 --------------------------------------------------------------------------- */
 
 @theme {
-  /* Ground. Warm off-white, so near-black reads as ink on paper rather than
-     as a screen. */
-  --color-paper: #f4f1ea;
+  /* Surfaces */
+  --color-ground: #f4f1ea;
+  --color-ground-inverse: #16150f;
 
-  /* Primary text. Near-black with a trace of warmth to sit with the paper;
-     pure #000 on a warm ground looks like a hole. */
+  /* Type */
   --color-ink: #16150f;
+  --color-ink-inverse: #f4f1ea;
+  --color-muted: #737065;
 
-  /* Secondary text. */
-  --color-ink-muted: #737065;
-
-  /* Hairline rules and borders — same family, far lighter. */
+  /* Hairlines */
   --color-rule: #dedad0;
 
-  /* The one accent. Deep green, used rarely and never as body text; its value
-     is that it is a surprise when it appears. */
+  /* The surface the portrait is printed on. A hairline's worth of separation
+     was not enough — at --color-rule the plate vanished into the page in
+     light and swallowed the subject's hair in dark. This is one step further
+     out from ground in both themes, which is the least that keeps the
+     silhouette readable either way. */
+  --color-plate: #cfcabd;
+
+  /* The one accent. Rare by design. */
   --color-accent: #3f5d3a;
 
+  /* Bricolage Grotesque, loaded by next/font and exposed as --font-display.
+     The stack behind it covers the moment before the font resolves. */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    var(--font-display), ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
+
+/* Dark. Same roles, different values.
+
+   The accent has to lighten here — #3f5d3a is legible on paper and nearly
+   invisible on near-black. An accent that does not survive the flip is not a
+   token, it is a light-mode decision in disguise. */
+[data-theme="dark"] {
+  --color-ground: #16150f;
+  --color-ground-inverse: #f4f1ea;
+  --color-ink: #f4f1ea;
+  --color-ink-inverse: #16150f;
+  --color-muted: #9a968a;
+  --color-rule: #2e2c24;
+  --color-plate: #4a463b;
+  --color-accent: #8cb183;
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+--------------------------------------------------------------------------- */
 
 @layer base {
   html {
     /* Lenis owns scrolling; native smooth-scroll fights it. */
     scroll-behavior: auto;
-    background-color: var(--color-paper);
+    background-color: var(--color-ground);
+    color-scheme: light;
+  }
+
+  html[data-theme="dark"] {
+    /* Tells the browser to render form controls, scrollbars and the
+       overscroll gutter dark. Without it those stay light and the illusion
+       breaks at the edges of the page. */
+    color-scheme: dark;
   }
 
   body {
-    background-color: var(--color-paper);
+    background-color: var(--color-ground);
     color: var(--color-ink);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    /* Short enough to feel like a switch rather than a fade. Suppressed
+       wholesale by the reduced-motion block below. */
+    transition:
+      background-color 200ms ease,
+      color 200ms ease;
+  }
+
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-ground);
   }
 
   :focus-visible {
@@ -60,19 +110,23 @@
   }
 }
 
-/* The intro overlay is always server-rendered, so React hydrates identical
-   markup whether or not it plays. When it is not playing the head script
-   leaves `data-intro` unset and this hides it before it can paint; React then
-   unmounts it after hydration. Deciding in React alone costs a visible frame. */
+/* ---------------------------------------------------------------------------
+   Intro
+--------------------------------------------------------------------------- */
+
+/* The overlay is always server-rendered so React hydrates identical markup
+   whether or not it plays. When it is not playing the head script leaves
+   `data-intro` unset and this hides it before it can paint. Deciding in React
+   alone costs one visible frame of curtain. */
 html:not([data-intro="play"]) [data-intro-root] {
   display: none;
 }
 
-/* While the intro is up the document itself is dark. Without this, the first
-   frame and any overscroll past the overlay show the paper page colour behind
-   it, which breaks the arrival before it starts. */
+/* While the intro is up, the document itself is the inverse surface. Without
+   this the first frame — and any rubber-band overscroll past the overlay —
+   shows the page colour behind it, which breaks the arrival before it starts. */
 html[data-intro="play"] {
-  background-color: var(--color-ink);
+  background-color: var(--color-ground-inverse);
 }
 
 /* Set by the head script before paint, cleared when the intro releases. */
@@ -81,9 +135,24 @@ html[data-loading="true"] body {
   overflow: hidden;
 }
 
-/* The GSAP layer already checks this preference, but CSS animations and
-   transitions do not. Neutralised once, here. */
+/* Elements that animate in start hidden, but only when animation will run.
+   `data-animate` is set by the head script only when motion is welcome, so
+   with reduced motion or no JavaScript nothing is ever hidden. */
+:root[data-animate="true"] [data-enter] {
+  opacity: 0;
+  transform: translate3d(0, 1.25rem, 0);
+}
+
+/* ---------------------------------------------------------------------------
+   Reduced motion: one global escape hatch.
+--------------------------------------------------------------------------- */
+
 @media (prefers-reduced-motion: reduce) {
+  :root[data-animate="true"] [data-enter] {
+    opacity: 1;
+    transform: none;
+  }
+
   *,
   *::before,
   *::after {
@@ -92,4 +161,12 @@ html[data-loading="true"] body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* The theme toggle renders both icons so the server and client emit identical
+   markup; which one is visible is a styling decision, made here. Each shows
+   the theme you would switch TO. */
+[data-theme="light"] [data-icon="sun"],
+[data-theme="dark"] [data-icon="moon"] {
+  display: none;
 }
