@@ -40,6 +40,12 @@ export function Work({ entries = work }: { entries?: readonly WorkEntry[] }) {
             // Linear: the scrub already maps scroll to progress, and easing on
             // top of it makes the words appear to drift against the scroll.
             ease: "none",
+            // Duration is what makes this read as a gradient instead of a
+            // wipe. Each word takes `duration` to resolve while the next
+            // starts `stagger` later, so roughly duration/stagger words are
+            // in flight at once — measured at the default 0.9 only two were,
+            // which looks like a hard edge travelling down the paragraph.
+            duration: 3,
             stagger: 0.4,
             scrollTrigger: {
               trigger: entry,
@@ -59,6 +65,13 @@ export function Work({ entries = work }: { entries?: readonly WorkEntry[] }) {
   // Nothing to show is a valid state while the entries are being written.
   if (!entries.length) return null;
 
+  // Array.prototype.sort is stable per spec, so entries that are equally
+  // featured keep the order they were written in — the list stays editable by
+  // hand rather than being silently rearranged.
+  const ordered = [...entries].sort(
+    (a, b) => Number(b.featured ?? false) - Number(a.featured ?? false),
+  );
+
   return (
     <section id="work" ref={ref} className="py-28 md:py-40">
       <div className="mx-auto w-full max-w-6xl px-6 md:px-10">
@@ -74,7 +87,7 @@ export function Work({ entries = work }: { entries?: readonly WorkEntry[] }) {
         </div>
 
         <ol>
-          {entries.map((entry, i) => (
+          {ordered.map((entry, i) => (
             <Entry key={entry.name} entry={entry} index={i + 1} />
           ))}
         </ol>
@@ -94,7 +107,12 @@ function Entry({ entry, index }: { entry: WorkEntry; index: number }) {
           <span className="text-xs text-muted tabular-nums">
             {String(index).padStart(2, "0")}
           </span>
-          <h3 className="text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">
+          {/* Balanced, so a hyphenated name breaks at its space rather than
+              after the hyphen — "Tamper-Evident e- / Voting" is a worse line
+              than "Tamper-Evident / e-Voting", and balancing prefers the
+              evener pair without needing a non-breaking hyphen the typeface
+              may not carry. */}
+          <h3 className="text-2xl font-semibold tracking-[-0.02em] text-balance sm:text-3xl">
             {entry.name}
           </h3>
         </div>
@@ -102,6 +120,16 @@ function Entry({ entry, index }: { entry: WorkEntry; index: number }) {
         <p className="mt-2 ml-8 text-sm text-muted">{entry.what}</p>
 
         <Status status={entry.status} note={entry.note} />
+
+        {/* The role is a claim, not metadata: on a page carrying client work,
+            "shipped a ride-hailing platform" and "led eight developers
+            building one" are different sentences and the reader should not
+            have to guess which is meant. So it is set in ink, not muted. */}
+        <p className="mt-3 ml-8 text-sm text-ink">{entry.role}</p>
+
+        <p className="mt-1 ml-8 text-xs text-muted">
+          {entry.fields.join(" · ")}
+        </p>
       </div>
 
       <div className="md:col-span-7 md:col-start-6">
@@ -110,9 +138,10 @@ function Entry({ entry, index }: { entry: WorkEntry; index: number }) {
         </p>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted">
-          <span>
-            {entry.stack.join(" · ")} · {entry.year}
-          </span>
+          {/* Joined as one list rather than "stack · year", so an entry with
+              nothing built yet shows the year alone instead of a dangling
+              separator. */}
+          <span>{[...entry.stack, entry.year].join(" · ")}</span>
           {entry.href && <External href={entry.href} />}
           {entry.source && <External href={entry.source} label="Source" />}
         </div>
