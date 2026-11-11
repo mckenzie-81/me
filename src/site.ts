@@ -15,14 +15,20 @@ export const site = {
   location: "Accra, Ghana",
 
   /**
-   * The hero line. Dry rather than earnest, and pointed at the engineering
-   * rather than the output — it is the sentence the rest of the site has to
-   * earn. Placeholder status: chosen to ship, expected to change.
+   * The hero line.
    *
-   * Typographic apostrophe, not a straight quote: at display size the
-   * difference is obvious.
+   * Philippians 4:13, then a hard turn. The verse is doing the setup and the
+   * second clause is the punchline, which only lands because the first half is
+   * quoted straight — so it is left exactly as the verse reads, and the comma
+   * is the beat before the narrowing.
+   *
+   * The non-breaking space is deliberate. `text-balance` optimises for even
+   * line lengths and knows nothing about meaning, and on a phone it broke the
+   * quotation as "all things through / Christ". Binding the pair costs one
+   * character and keeps the verse intact at every width.
    */
-  intro: "I\u2019m unreasonably invested in the parts you will never see.",
+  intro:
+    "I can do all things through\u00A0Christ, especially all things that involve systems.",
 
   /** TODO: confirm. Only one is verified. */
   roles: ["Software Engineer"],
