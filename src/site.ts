@@ -11,7 +11,6 @@ export const site = {
   name: ["Richard Bright", "Asiedu-Bentum"],
   /** What the signature says, and what people actually call him. */
   knownAs: "Mckenzie",
-  /** The header mark. Short on purpose. */
 
   location: "Accra, Ghana",
 
@@ -40,5 +39,5 @@ export const site = {
     { label: "Contact", href: "#contact" },
   ],
 
-  repo: "https://github.com/",
+  repo: "https://github.com/mckenzie-81/me",
 } as const;

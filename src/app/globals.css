@@ -143,6 +143,13 @@ html[data-loading="true"] body {
   transform: translate3d(0, 1.25rem, 0);
 }
 
+/* Words waiting to be read in. Dimmed rather than hidden: the reasoning is
+   the substance of the Work section, so the failure mode when a ScrollTrigger
+   never fires has to be "slightly grey", not "blank". */
+:root[data-animate="true"] [data-word] {
+  opacity: 0.25;
+}
+
 /* ---------------------------------------------------------------------------
    Reduced motion: one global escape hatch.
 --------------------------------------------------------------------------- */
@@ -151,6 +158,10 @@ html[data-loading="true"] body {
   :root[data-animate="true"] [data-enter] {
     opacity: 1;
     transform: none;
+  }
+
+  :root[data-animate="true"] [data-word] {
+    opacity: 1;
   }
 
   *,
